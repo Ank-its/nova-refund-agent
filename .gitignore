@@ -1,0 +1,21 @@
+# Dependencies
+node_modules/
+
+# Build output / caches
+.next/
+*.tsbuildinfo
+__pycache__/
+*.pyc
+.venv/
+*.egg-info/
+dist/
+build/
+
+# Secrets / environment
+.env
+.env.local
+.env.*.local
+
+# OS junk
+.DS_Store
+Thumbs.db
