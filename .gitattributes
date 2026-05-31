@@ -1,0 +1,20 @@
+# Normalize line endings across platforms. Git stores text as LF; checkout
+# converts per-platform — EXCEPT where we pin eol below.
+* text=auto
+
+# Shell scripts MUST stay LF even on Windows checkouts, or the container's
+# shebang becomes `#!/usr/bin/env bash\r` and the script exits 127
+# ("command not found"). This pin overrides core.autocrlf on clone.
+*.sh text eol=lf
+entrypoint.sh text eol=lf
+
+# Dockerfiles and env files are read by Linux tooling — keep LF.
+Dockerfile text eol=lf
+*.dockerfile text eol=lf
+.env.example text eol=lf
+
+# Binary assets — never touch.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.svg text eol=lf

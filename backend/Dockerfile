@@ -19,6 +19,8 @@ COPY . .
 
 EXPOSE 8000
 
-# entrypoint waits for DB, runs migrations + seed, then boots uvicorn
-RUN chmod +x ./entrypoint.sh
-CMD ["./entrypoint.sh"]
+# entrypoint waits for DB, runs migrations + seed, then boots uvicorn.
+# Strip any CR (Windows clones may introduce CRLF) so the shebang resolves,
+# then make executable. Invoke via bash to be doubly safe across checkouts.
+RUN sed -i 's/\r$//' ./entrypoint.sh && chmod +x ./entrypoint.sh
+CMD ["bash", "./entrypoint.sh"]
