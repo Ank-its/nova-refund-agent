@@ -32,6 +32,9 @@ export default function Dashboard({
   const [activeId, setActiveId] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [busy, setBusy] = useState(false);
+  // Separate from `busy`: the indicator hides when the reply arrives, while the
+  // request stays busy during conversation titling (avoids it reappearing).
+  const [thinking, setThinking] = useState(false);
   const [liveSteps, setLiveSteps] = useState<string[]>([]);
   const [liveTrace, setLiveTrace] = useState<TraceEvent[]>([]);
   const [telemetryKey, setTelemetryKey] = useState(0);
@@ -127,6 +130,7 @@ export default function Dashboard({
           steps: finalSteps,
         });
         setLiveSteps([]);
+        setThinking(false); // answer is in — drop the indicator immediately
       }
     } else if (frame.event === "trace") {
       const t = d.type;
@@ -169,6 +173,7 @@ export default function Dashboard({
     async (text: string) => {
       pushMessage({ kind: "user", text });
       setBusy(true);
+      setThinking(true);
       stepsRef.current = [];
       setLiveSteps([]);
       setLiveTrace([]);
@@ -200,6 +205,7 @@ export default function Dashboard({
         }
       } finally {
         setBusy(false);
+        setThinking(false);
         setLiveSteps([]);
         setTelemetryKey((k) => k + 1);
       }
@@ -237,6 +243,7 @@ export default function Dashboard({
             messages={messages}
             liveSteps={liveSteps}
             busy={busy}
+            thinking={thinking}
             disabled={!canChat}
             disabledReason="This is an admin-only account. Chat is disabled — open the telemetry panel from the top bar."
             onSend={send}

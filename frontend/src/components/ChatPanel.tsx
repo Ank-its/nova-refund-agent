@@ -78,17 +78,29 @@ function Reasoning({ steps }: { steps: string[] }) {
   );
 }
 
-// Transient, live "thinking" panel — shown only while the agent works, then
-// collapsed into the answer's Reasoning trail (never persisted as messages).
+// While awaiting a reply: a typing indicator (dots) when there are no step
+// labels yet, or the streamed tool-progress labels during a refund flow.
 function Thinking({ steps }: { steps: string[] }) {
   const current = steps[steps.length - 1];
+  if (!current) {
+    return (
+      <div className="flex items-start gap-2.5 animate-rise">
+        <Avatar />
+        <div className="rounded-2xl rounded-bl-md bg-white/70 px-4 py-3.5 ring-1 ring-black/5 backdrop-blur">
+          <span className="flex gap-1" aria-label="Nova is typing">
+            <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted/60 [animation-delay:-0.3s]" />
+            <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted/60 [animation-delay:-0.15s]" />
+            <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-muted/60" />
+          </span>
+        </div>
+      </div>
+    );
+  }
   return (
     <div className="flex items-start gap-2.5 animate-rise">
       <Avatar />
       <div className="rounded-2xl rounded-bl-md bg-white/70 px-4 py-3 ring-1 ring-black/5 backdrop-blur">
-        <span className="text-sm font-medium shimmer-text">
-          {current || "Thinking"}
-        </span>
+        <span className="text-sm font-medium shimmer-text">{current}</span>
         {steps.length > 1 && (
           <ol className="mt-2 space-y-0.5">
             {steps.slice(0, -1).map((s, i) => (
@@ -108,6 +120,7 @@ export default function ChatPanel({
   messages,
   liveSteps,
   busy,
+  thinking,
   disabled,
   disabledReason,
   onSend,
@@ -116,6 +129,7 @@ export default function ChatPanel({
   messages: ChatMessage[];
   liveSteps: string[];
   busy: boolean;
+  thinking: boolean;
   disabled: boolean;
   disabledReason?: string;
   onSend: (text: string) => void;
@@ -125,7 +139,7 @@ export default function ChatPanel({
 
   useEffect(() => {
     endRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages, liveSteps, busy]);
+  }, [messages, liveSteps, thinking]);
 
   function submit() {
     const t = input.trim();
@@ -201,7 +215,7 @@ export default function ChatPanel({
                   </div>
                 );
               })}
-              {busy && <Thinking steps={liveSteps} />}
+              {thinking && <Thinking steps={liveSteps} />}
             </div>
           )}
 
