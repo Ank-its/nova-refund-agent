@@ -146,11 +146,10 @@ class Refund(Base):
 
 
 class Conversation(Base):
-    """Chat thread + multi-turn agent state, scoped to a user.
+    """Chat thread scoped to a user.
 
-    ``pending_order_ref`` / ``pending_candidates`` hold the in-flight agent
-    state (order awaiting a reason, or orders offered for selection) so a flow
-    resumes across turns, reloads, and logins.
+    Multi-turn agent state is reconstructed by replaying the persisted messages
+    into the agent each turn, so no in-flight state is stored on this row.
     """
 
     __tablename__ = "conversations"
@@ -160,8 +159,6 @@ class Conversation(Base):
         Uuid, ForeignKey("users.id", ondelete="CASCADE"), index=True
     )
     title: Mapped[str] = mapped_column(String(120), default="New conversation")
-    pending_order_ref: Mapped[str | None] = mapped_column(String(32), nullable=True)
-    pending_candidates: Mapped[list] = mapped_column(JSON, default=list)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utcnow, onupdate=utcnow
