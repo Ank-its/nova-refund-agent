@@ -124,7 +124,11 @@ async def _event_stream(principal: Principal, body: ChatRequest, request: Reques
     response = final.get("response", "I'm not sure how to help with that.")
     decision = final.get("decision") or {}
     candidates = final.get("candidates") or []
-    steps = [t["label"] for t in final.get("trace", [])]
+    # Only attach a reasoning trail on refund-flow turns (a decision, an order
+    # clarification, or an awaiting-reason step). Pure greetings / small-talk
+    # have none of these, so they render a clean bubble with no "Reasoning".
+    is_refund_flow = bool(decision or candidates or final.get("pending_reason_for"))
+    steps = [t["label"] for t in final.get("trace", [])] if is_refund_flow else []
 
     yield _sse("chat", {
         "role": "assistant",
@@ -133,6 +137,7 @@ async def _event_stream(principal: Principal, body: ChatRequest, request: Reques
         "decision": decision.get("decision"),
         "rule": decision.get("rule"),
         "candidates": candidates,
+        "steps": steps,  # gated: empty for greetings/small-talk
     })
 
     if _looks_like_injection(body.message):

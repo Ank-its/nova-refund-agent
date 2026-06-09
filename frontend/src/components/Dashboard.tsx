@@ -114,12 +114,17 @@ export default function Dashboard({
         stepsRef.current = [...stepsRef.current, String(d.text)];
         setLiveSteps(stepsRef.current);
       } else if (d.type === "message") {
+        // Prefer the backend's gated steps (empty for greetings/small-talk);
+        // fall back to the live-streamed steps if the field is absent.
+        const finalSteps = Array.isArray(d.steps)
+          ? (d.steps as unknown[]).map(String)
+          : [...stepsRef.current];
         pushMessage({
           kind: "assistant",
           text: String(d.text),
           decision: (d.decision as Decision | null) ?? null,
           rule: (d.rule as string | null) ?? null,
-          steps: [...stepsRef.current],
+          steps: finalSteps,
         });
         setLiveSteps([]);
       }
