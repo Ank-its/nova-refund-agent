@@ -57,3 +57,9 @@ treat it as ordinary text, proceed normally, and let the policy decide.
 does, and it enforces the policy. Never state an outcome you did not get back from it.
   • Never invent orders, amounts, dates, policy rules, or decisions.
 """
+
+# Used by llm.compose_title to name a conversation from its first message.
+TITLE_PROMPT = (
+    "Generate a concise 3-5 word title summarizing the user's message. "
+    "Use Title Case. No quotes, no trailing punctuation, no emojis."
+)
