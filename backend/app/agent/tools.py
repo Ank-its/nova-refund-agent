@@ -84,7 +84,7 @@ async def get_order_details(order_ref: str) -> str:
     """Return the verified facts for ONE order, needed to apply the policy (JSON).
 
     Includes amount, days since purchase, final-sale flag, any existing refund's
-    status (refund_status: approved | pending_review | rejected | null), and the
+    status (refund_status: approved | pending_review | null), and the
     customer's approved-refund count in the trailing 30 days. Call this before
     submitting a refund, and to answer questions about an existing refund's status.
     """
@@ -151,9 +151,7 @@ async def submit_refund(order_ref: str, reason: str, recommended_decision: str) 
         )
 
     authoritative = outcome.decision.decision
-    overridden = (
-        recommended_decision or ""
-    ).strip().lower() != authoritative and recommended_decision is not None
+    overridden = (recommended_decision or "").strip().lower() != authoritative
     result = {
         "decision": authoritative,
         "rule": outcome.decision.rule,

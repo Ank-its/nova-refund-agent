@@ -257,7 +257,7 @@ nova/  (worknoon-refund-agent)
 │       │   └── schema.py            # ← ALL SQLAlchemy ORM tables (single file)
 │       ├── data/refund_policy.txt   # ← the corporate policy the agent reads
 │       ├── models/                  # ← Pydantic models: decision, api
-│       ├── services/                # rules, refunds, orders, conversations, audit
+│       ├── services/                # rules, refunds, conversations, audit
 │       ├── agent/                   # graph + tools + runtime + prompts + llm
 │       ├── eval/                    # golden-set evaluation harness (python -m app.eval)
 │       ├── api/                     # deps, security, routes/{auth,chat,conversations,admin}

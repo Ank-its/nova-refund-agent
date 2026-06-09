@@ -1,13 +1,15 @@
 """Tool-call audit logging (own session, decoupled from the refund txn)."""
 from __future__ import annotations
 
+import uuid
+
 from app.db.session import SessionLocal
 from app.db.schema import ToolAuditLog
 
 
 async def log_tool_call(
     *,
-    customer_id: int | None,
+    customer_id: uuid.UUID | None,
     tool_name: str,
     arguments: dict,
     result: dict,

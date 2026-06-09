@@ -262,7 +262,7 @@ async def _event_stream(principal: Principal, body: ChatRequest, request: Reques
     yield _sse("trace", {
         "type": "summary", "total_ms": int((time.perf_counter() - t0) * 1000),
         "decision": decision.get("decision"), "rule": decision.get("rule"),
-        "used_llm": GRAPH is not None,
+        "used_llm": True,
     })
     yield _sse("control", {"type": "done"})
 

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import time
+import uuid
 from dataclasses import dataclass, field
 from datetime import timedelta
 
@@ -33,7 +34,7 @@ class RefundOutcome:
 
 
 async def process_refund(
-    session: AsyncSession, *, customer_id: int, order_ref: str, reason: str
+    session: AsyncSession, *, customer_id: uuid.UUID, order_ref: str, reason: str
 ) -> RefundOutcome:
     """Resolve -> lock -> evaluate -> (maybe) mutate, atomically.
 
