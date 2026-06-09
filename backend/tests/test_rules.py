@@ -1,10 +1,9 @@
-"""Exhaustive unit tests for the pure refund rule matrix and helpers.
+"""Exhaustive unit tests for the pure refund rule matrix.
 
 No database, no LLM — these pin the deterministic logic and its precedence.
 """
 from __future__ import annotations
 
-from app.agent.state import extract_order_ref
 from app.core.config import Settings
 from app.services.rules import evaluate_rules, reason_is_damage
 
@@ -96,13 +95,3 @@ def test_injection_not_counted_as_damage():
 def test_real_damage_keywords_detected():
     for r in ["it's broken", "DEFECTIVE unit", "arrived damaged", "screen cracked"]:
         assert reason_is_damage(r) is True
-
-
-def test_extract_order_ref_from_explicit_code():
-    assert extract_order_ref("please refund ORD_1001") == "ORD_1001"
-    assert extract_order_ref("refund ord-1003 now") == "ORD_1003"
-
-
-def test_extract_order_ref_none_when_only_product_named():
-    assert extract_order_ref("I want to return my monitor stand") is None
-    assert extract_order_ref("refund the broken headphones") is None

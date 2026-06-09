@@ -62,9 +62,9 @@ default models:
 | `anthropic` | `ANTHROPIC_API_KEY` | `claude-3-5-haiku-latest` |
 | `google` | `GOOGLE_API_KEY` | `gemini-1.5-flash` |
 
-**No key?** The assistant degrades gracefully: extraction falls back to a regex
-parser and replies to clean templates. The deterministic decision engine is
-byte-for-byte identical either way.
+**A model API key is required** — the agent drives an LLM end to end. Set
+`LLM_PROVIDER` and the matching key before starting; without one, the chat
+endpoint replies that the assistant isn't configured.
 
 ### Demo accounts
 
@@ -256,9 +256,9 @@ nova/  (worknoon-refund-agent)
 │       │   ├── session.py           # async engine/session + Base
 │       │   └── schema.py            # ← ALL SQLAlchemy ORM tables (single file)
 │       ├── data/refund_policy.txt   # ← the corporate policy the agent reads
-│       ├── models/                  # ← Pydantic models: extraction, decision, api
+│       ├── models/                  # ← Pydantic models: decision, api
 │       ├── services/                # rules, refunds, orders, conversations, audit
-│       ├── agent/                   # graph + tools + runtime + prompts + llm + fallback
+│       ├── agent/                   # graph + tools + runtime + prompts + llm
 │       ├── eval/                    # golden-set evaluation harness (python -m app.eval)
 │       ├── api/                     # deps, security, routes/{auth,chat,conversations,admin}
 │       └── seed/                    # demo accounts + edge-case data
@@ -282,12 +282,10 @@ nova/  (worknoon-refund-agent)
   reads `data/refund_policy.txt` and the order facts and recommends an outcome;
   `agent/tools.py::submit_refund` recomputes the decision deterministically and
   persists it, so policy enforcement and prompt-injection resistance never depend
-  on the model behaving. No LLM key? `GRAPH` is `None` and a deterministic handler
-  (`agent/fallback.py`) keeps the app demonstrable.
+  on the model behaving.
 - **Models vs. schema:** SQLAlchemy ORM = `app/db/schema.py` (one consolidated
   file); Pydantic = `app/models/`. Services/agents import ORM from
-  `app.db.schema` and DTOs from `app.models.*`. (`models/extraction.py` now backs
-  only the no-key fallback parser.)
+  `app.db.schema` and DTOs from `app.models.*`.
 - **Provider abstraction:** `agent/llm.py::_make_chat` builds the right LangChain
   chat model from `LLM_PROVIDER`; every LLM call shares it. Provider SDK imports
   are local, so only the selected provider's package is touched at runtime.

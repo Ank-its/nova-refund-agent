@@ -11,11 +11,8 @@ from app.models.api import (
     MessageOut,
 )
 from app.models.decision import RuleDecision
-from app.models.extraction import ExtractedArgs, Intent
 
 __all__ = [
-    "ExtractedArgs",
-    "Intent",
     "RuleDecision",
     "LoginRequest",
     "LoginResponse",

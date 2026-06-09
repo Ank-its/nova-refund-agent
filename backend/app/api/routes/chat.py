@@ -18,7 +18,6 @@ from fastapi import APIRouter, Depends, HTTPException, Request
 from langchain_core.messages import AIMessage, HumanMessage, ToolMessage
 from sse_starlette.sse import EventSourceResponse
 
-from app.agent.fallback import regex_extract
 from app.agent.graph import GRAPH
 from app.agent.llm import compose_title
 from app.agent.runtime import set_current_customer
@@ -26,7 +25,6 @@ from app.api.deps import current_principal
 from app.api.security import Principal
 from app.db.session import SessionLocal
 from app.models.api import ChatRequest
-from app.models.extraction import Intent
 from app.services.conversations import (
     add_message,
     count_messages,
@@ -34,8 +32,6 @@ from app.services.conversations import (
     get_conversation,
     get_messages,
 )
-from app.services.orders import list_orders
-from app.services.refunds import process_refund
 
 router = APIRouter(prefix="/api/chat", tags=["chat"])
 
@@ -174,62 +170,6 @@ async def _emit_agent(state, request: Request, t0: float):
     }
 
 
-async def _emit_fallback(state_text: str, customer_id: uuid.UUID, t0: float):
-    """No-LLM path: deterministic, single-shot, still policy-correct."""
-    args = regex_extract(state_text)
-    labels: list[str] = []
-    decision: dict = {}
-
-    if args.intent != Intent.request_refund and not args.order_ref:
-        yield {
-            "final_text": (
-                "Hi! I'm Nova. I can help you return or refund an item — tell me "
-                "what you'd like to return, or give an order reference like ORD_1001."
-            ),
-            "decision": {}, "labels": [], "guardrail_override": None,
-        }
-        return
-
-    if not args.order_ref:
-        async with SessionLocal() as s:
-            orders = await list_orders(s, customer_id, None)
-        listing = "\n".join(
-            f"{i + 1}. {o.item_name} — ${float(o.amount):,.2f} ({o.order_ref})"
-            for i, o in enumerate(orders)
-        )
-        labels = ["Looking up your orders"]
-        yield _sse("trace", {"type": "node", "node": "get_customer_orders",
-                             "label": "Looking up your orders", "detail": f"{len(orders)} order(s)",
-                             "data": {}, "elapsed_ms": int((time.perf_counter() - t0) * 1000)})
-        yield {
-            "final_text": ("Which order is this about?\n\n" + listing) if orders
-            else "I couldn't find any orders on your account.",
-            "decision": {}, "labels": labels, "guardrail_override": None,
-        }
-        return
-
-    labels = ["Processing your refund"]
-    yield _sse("chat", {"role": "system", "type": "progress", "text": "Processing your refund"})
-    async with SessionLocal() as s:
-        outcome = await process_refund(
-            s, customer_id=customer_id, order_ref=args.order_ref, reason=state_text
-        )
-    decision = {
-        "decision": outcome.decision.decision, "rule": outcome.decision.rule,
-        "summary": outcome.decision.summary, "order": outcome.order,
-    }
-    yield _sse("trace", {"type": "node", "node": "submit_refund",
-                         "label": "Processing your refund ✓",
-                         "detail": f"{outcome.decision.decision} ({outcome.decision.rule})",
-                         "data": decision, "elapsed_ms": int((time.perf_counter() - t0) * 1000)})
-    badge = {"approved": "✅ Approved", "pending_review": "🕒 Sent for human review",
-             "rejected": "❌ Not eligible"}.get(outcome.decision.decision, "")
-    yield {
-        "final_text": f"{badge}\n\n{outcome.decision.summary}",
-        "decision": decision, "labels": labels, "guardrail_override": None,
-    }
-
-
 async def _event_stream(principal: Principal, body: ChatRequest, request: Request):
     t0 = time.perf_counter()
     set_current_customer(principal.customer_id)
@@ -252,14 +192,20 @@ async def _event_stream(principal: Principal, body: ChatRequest, request: Reques
     yield _sse("meta", {"conversation_id": str(conv_id), "title": title})
     yield _sse("chat", {"role": "system", "type": "ack", "text": "Connected."})
 
+    if GRAPH is None:
+        yield _sse("chat", {
+            "role": "assistant", "type": "message",
+            "text": "The assistant isn't available right now — no model API key is "
+                    "configured. Add one to the environment and restart.",
+            "decision": None, "rule": None, "candidates": [], "steps": [],
+        })
+        yield _sse("control", {"type": "done"})
+        return
+
     result: dict = {}
     try:
-        if GRAPH is not None:
-            state = {"messages": _to_messages(history, body.message)}
-            gen = _emit_agent(state, request, t0)
-        else:
-            gen = _emit_fallback(body.message, principal.customer_id, t0)
-        async for item in gen:
+        state = {"messages": _to_messages(history, body.message)}
+        async for item in _emit_agent(state, request, t0):
             if "event" in item:           # an SSE frame
                 yield item
             else:                          # the trailing result dict
