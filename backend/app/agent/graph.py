@@ -1,53 +1,50 @@
-"""LangGraph assembly and convenience runner."""
+"""The tool-calling agent: a LangGraph ReAct loop (START → agent ⇄ tools → END).
+
+The LLM decides each turn whether to call a tool or answer; tools_condition loops
+back through the tools until it produces a final, tool-free reply. The model
+orchestrates but never decides — submit_refund enforces the policy. GRAPH is None
+when no LLM key is set; the chat route then uses the deterministic fallback.
+"""
 from __future__ import annotations
 
-from langgraph.graph import END, START, StateGraph
+from typing import Annotated, TypedDict
 
-from app.agent.nodes import ask_reason, clarify, decide, extract, route, smalltalk
-from app.agent.state import AgentState
+from langchain_core.messages import AnyMessage, SystemMessage
+from langgraph.graph import END, START, StateGraph
+from langgraph.graph.message import add_messages
+from langgraph.prebuilt import ToolNode, tools_condition
+
+from app.agent.llm import make_agent_model
+from app.agent.prompts import SYSTEM_PROMPT
+from app.agent.tools import TOOLS
+
+
+class AgentState(TypedDict):
+    messages: Annotated[list[AnyMessage], add_messages]
 
 
 def build_graph():
-    g = StateGraph(AgentState)
-    g.add_node("extract", extract)
-    g.add_node("ask_reason", ask_reason)
-    g.add_node("decide", decide)
-    g.add_node("clarify", clarify)
-    g.add_node("smalltalk", smalltalk)
+    model = make_agent_model()
+    if model is None:
+        return None
+    llm = model.bind_tools(TOOLS)
 
-    g.add_edge(START, "extract")
-    g.add_conditional_edges(
-        "extract",
-        route,
-        {
-            "ask_reason": "ask_reason",
-            "decide": "decide",
-            "clarify": "clarify",
-            "smalltalk": "smalltalk",
-        },
-    )
-    for node in ("ask_reason", "decide", "clarify", "smalltalk"):
-        g.add_edge(node, END)
+    async def agent(state: AgentState) -> dict:
+        msgs = state["messages"]
+        # Lead every turn with the system prompt without persisting it into the
+        # accumulating message history.
+        if not msgs or not isinstance(msgs[0], SystemMessage):
+            msgs = [SystemMessage(content=SYSTEM_PROMPT), *msgs]
+        response = await llm.ainvoke(msgs)
+        return {"messages": [response]}
+
+    g = StateGraph(AgentState)
+    g.add_node("agent", agent)
+    g.add_node("tools", ToolNode(TOOLS))
+    g.add_edge(START, "agent")
+    g.add_conditional_edges("agent", tools_condition)
+    g.add_edge("tools", "agent")
     return g.compile()
 
 
 GRAPH = build_graph()
-
-
-async def run_agent(
-    *,
-    customer_id: int,
-    user_text: str,
-    history: list[dict] | None = None,
-    pending_candidates: list[str] | None = None,
-    pending_reason_for: str | None = None,
-) -> AgentState:
-    state: AgentState = {
-        "user_text": user_text,
-        "customer_id": customer_id,
-        "history": history or [],
-        "pending_candidates": pending_candidates or [],
-        "pending_reason_for": pending_reason_for,
-        "trace": [],
-    }
-    return await GRAPH.ainvoke(state)

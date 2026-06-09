@@ -74,6 +74,15 @@ def _make_chat(temperature: float):
     return ChatOpenAI(model=model, api_key=key, temperature=temperature)
 
 
+def make_agent_model():
+    """The chat model the tool-calling agent drives (temperature 0), or None.
+
+    Returns None when no API key is configured for the selected provider, so the
+    graph can fall back to the deterministic handler and the app still runs.
+    """
+    return _make_chat(temperature=0)
+
+
 async def extract_args(text: str) -> tuple[ExtractedArgs, str]:
     """Return (extracted args, extractor name: 'llm' | 'regex')."""
     chat = _make_chat(temperature=0)
