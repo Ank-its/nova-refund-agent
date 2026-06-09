@@ -140,8 +140,9 @@ export async function streamChat(
   const reader = res.body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
+  let finished = false;
 
-  while (true) {
+  while (!finished) {
     const { done, value } = await reader.read();
     if (done) break;
     // Normalize CRLF -> LF: sse-starlette emits \r\n line endings and
@@ -161,11 +162,24 @@ export async function streamChat(
         else if (line.startsWith("data:")) dataLines.push(line.slice(5).trim());
       }
       if (dataLines.length === 0) continue;
+      let frame: SseFrame;
       try {
-        onFrame({ event, data: JSON.parse(dataLines.join("\n")) });
+        frame = { event, data: JSON.parse(dataLines.join("\n")) };
       } catch {
-        // ignore malformed frame
+        continue; // ignore malformed frame
+      }
+      onFrame(frame);
+      // The server signals end-of-turn with `event: control {type:"done"}`.
+      // sse-starlette keeps the HTTP connection open (keepalive pings), so the
+      // reader never reports `done` — we must stop on this sentinel ourselves,
+      // otherwise the caller's promise never resolves and the UI stays "busy".
+      if (event === "control" && frame.data?.type === "done") {
+        finished = true;
+        break;
       }
     }
   }
+
+  // Release the connection so the server can tear down the generator.
+  await reader.cancel().catch(() => {});
 }
