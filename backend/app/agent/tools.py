@@ -83,9 +83,10 @@ async def get_customer_orders() -> str:
 async def get_order_details(order_ref: str) -> str:
     """Return the verified facts for ONE order, needed to apply the policy (JSON).
 
-    Includes amount, days since purchase, final-sale flag, whether it has already
-    been refunded, and the customer's approved-refund count in the trailing 30
-    days. Call this before submitting a refund so you reason over real facts.
+    Includes amount, days since purchase, final-sale flag, any existing refund's
+    status (refund_status: approved | pending_review | rejected | null), and the
+    customer's approved-refund count in the trailing 30 days. Call this before
+    submitting a refund, and to answer questions about an existing refund's status.
     """
     t0 = time.perf_counter()
     cid = current_customer()
@@ -101,9 +102,7 @@ async def get_order_details(order_ref: str) -> str:
             await _audit("get_order_details", {"order_ref": order_ref}, result, t0)
             return json.dumps(result)
 
-        already_refunded = (
-            await s.scalar(select(Refund).where(Refund.order_id == order.id))
-        ) is not None
+        existing = await s.scalar(select(Refund).where(Refund.order_id == order.id))
         approved_30d = (
             await s.scalar(
                 select(func.count(Refund.id)).where(
@@ -122,7 +121,8 @@ async def get_order_details(order_ref: str) -> str:
             "amount": float(order.amount),
             "days_since_purchase": (utcnow() - order.purchase_date).days,
             "is_final_sale": order.is_final_sale,
-            "already_refunded": already_refunded,
+            "already_refunded": existing is not None,
+            "refund_status": existing.status if existing else None,
             "approved_refunds_last_30d": approved_30d,
         }
     await _audit("get_order_details", {"order_ref": order_ref}, result, t0)
